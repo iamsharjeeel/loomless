@@ -1,0 +1,9 @@
+{
+  "name": "Loomless",
+  "description": "A high-performance video workspace recording and document management dashboard. Features screen/camera recording, video playback, team collaboration, and automated SOP generation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

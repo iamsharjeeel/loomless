@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight, CreditCard, Database, FileText, User, Video } from "lucide-react";
+import SignOutButton from "@/components/SignOutButton";
 import type { UserProfile } from "@/lib/types";
 
 interface ProfileProps {
@@ -16,14 +17,19 @@ export default function Profile({ profile }: ProfileProps) {
       {/* Identity */}
       <div className="flex flex-col items-center gap-6 rounded border border-border bg-surface-1 p-6 shadow-card md:flex-row">
         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-accent bg-surface-2 text-fg-secondary">
-          <User className="h-9 w-9" />
+          {profile?.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+          ) : (
+            <User className="h-9 w-9" />
+          )}
         </div>
         <div className="flex-1 space-y-1 text-center md:text-left">
           <h2 className="text-xl font-bold">{displayName}</h2>
           <p className="font-mono text-xs text-fg-secondary">{email}</p>
           {profile?.role && (
             <p className="pt-1 text-xs text-fg-secondary">
-              Role: <span className="font-semibold text-fg-primary capitalize">{profile.role}</span>
+              Role: <span className="font-semibold capitalize text-fg-primary">{profile.role}</span>
               {profile.activeWorkspaceName && (
                 <>
                   {" "}
@@ -36,6 +42,7 @@ export default function Profile({ profile }: ProfileProps) {
             </p>
           )}
         </div>
+        <SignOutButton />
       </div>
 
       {/* Usage (placeholder metrics until billing/usage lands) */}

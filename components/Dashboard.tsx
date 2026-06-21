@@ -3,17 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   Clock,
   Globe,
   Lock,
   MoreVertical,
+  Pencil,
   Search,
   Share2,
   Trash2,
   User,
   Video,
+  X,
 } from "lucide-react";
 import { useShell } from "@/components/shell-context";
+import { createClient } from "@/lib/supabase/client";
 import { formatDuration, type Recording } from "@/lib/types";
 
 interface DashboardProps {
@@ -28,6 +32,33 @@ export default function Dashboard({ recordings }: DashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("all");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/recordings/${id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const startRename = (rec: Recording) => {
+    setEditingId(rec.id);
+    setEditValue(rec.title);
+  };
+
+  const saveRename = async (id: string) => {
+    const title = editValue.trim();
+    setEditingId(null);
+    if (!title) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("recordings").update({ title }).eq("id", id);
+    if (!error) router.refresh();
+  };
 
   const filtered = recordings.filter((rec) => {
     const haystack = `${rec.title} ${rec.description ?? ""}`.toLowerCase();
@@ -133,12 +164,43 @@ export default function Dashboard({ recordings }: DashboardProps) {
               {/* Info */}
               <div className="relative flex flex-grow flex-col p-4">
                 <div className="mb-1 flex items-start justify-between gap-2">
-                  <h3
-                    onClick={() => openPlayback(rec)}
-                    className="cursor-pointer truncate text-sm font-semibold leading-snug transition-colors hover:text-accent"
-                  >
-                    {rec.title}
-                  </h3>
+                  {editingId === rec.id ? (
+                    <div className="flex flex-1 items-center gap-1">
+                      <input
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveRename(rec.id);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        className="w-full rounded border border-border bg-surface-2 px-2 py-1 text-sm outline-none focus:border-border-active"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveRename(rec.id)}
+                        aria-label="Save title"
+                        className="rounded p-1 text-accent hover:bg-surface-2"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        aria-label="Cancel"
+                        className="rounded p-1 text-fg-tertiary hover:bg-surface-2"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <h3
+                      onClick={() => openPlayback(rec)}
+                      className="cursor-pointer truncate text-sm font-semibold leading-snug transition-colors hover:text-accent"
+                    >
+                      {rec.title}
+                    </h3>
+                  )}
 
                   <div className="relative shrink-0">
                     <button
@@ -157,6 +219,17 @@ export default function Dashboard({ recordings }: DashboardProps) {
                           <button
                             type="button"
                             onClick={() => {
+                              startRename(rec);
+                              setMenuOpenId(null);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-fg-primary hover:bg-surface-2"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
                               openShare(rec);
                               setMenuOpenId(null);
                             }}
@@ -167,8 +240,12 @@ export default function Dashboard({ recordings }: DashboardProps) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setMenuOpenId(null)}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium text-error hover:bg-error-container"
+                            disabled={busyId === rec.id}
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              handleDelete(rec.id);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium text-error hover:bg-error-container disabled:opacity-60"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             Delete

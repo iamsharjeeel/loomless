@@ -7,7 +7,7 @@
  * data-access layer (lib/data.ts) is wired to real queries.
  */
 
-export type RecordingStatus = "processing" | "ready" | "failed";
+export type RecordingStatus = "recording" | "processing" | "ready" | "failed";
 export type RecordingVisibility = "private" | "workspace" | "public";
 export type MemberRole = "owner" | "admin" | "editor" | "viewer";
 export type MemberStatus = "active" | "pending";

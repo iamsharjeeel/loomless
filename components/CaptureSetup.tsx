@@ -1,12 +1,35 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Camera, Check, Layers, Mic, Monitor, Play, X } from "lucide-react";
 import type { CaptureConfig } from "@/lib/types";
 
 interface CaptureSetupProps {
-  onStartCapture: (config: CaptureConfig) => void;
+  onStartCapture: (config: CaptureConfig, stream: MediaStream) => void;
   onClose: () => void;
+}
+
+/**
+ * Acquires a screen-capture stream (plus optional mic) within the click gesture
+ * so the browser permission prompt is tied to user activation. Mic audio is
+ * mixed into the display stream when requested.
+ */
+async function acquireStream(config: CaptureConfig): Promise<MediaStream> {
+  const display = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+
+  if (config.audio) {
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mic.getAudioTracks().forEach((track) => display.addTrack(track));
+    } catch {
+      // Mic denied — continue with whatever audio the display capture provided.
+    }
+  }
+
+  return display;
 }
 
 const SOURCES = [
@@ -21,26 +44,42 @@ export default function CaptureSetup({ onStartCapture, onClose }: CaptureSetupPr
   const [micActive, setMicActive] = useState(true);
   const [title, setTitle] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [acquiring, setAcquiring] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const handleSubmit = (e: FormEvent) => {
+  const config: CaptureConfig = {
+    source,
+    quality,
+    audio: micActive,
+    title: title.trim() || `Walkthrough — ${new Date().toLocaleString()}`,
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setCountdown(3);
+    setPermissionError(null);
+    setAcquiring(true);
+    try {
+      // Acquire within the gesture so permission prompts have user activation.
+      streamRef.current = await acquireStream(config);
+      setAcquiring(false);
+      setCountdown(3);
+    } catch {
+      setAcquiring(false);
+      setPermissionError("Screen capture was cancelled or blocked. Please try again.");
+    }
   };
 
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
-      onStartCapture({
-        source,
-        quality,
-        audio: micActive,
-        title: title.trim() || `Walkthrough — ${new Date().toLocaleString()}`,
-      });
+      if (streamRef.current) onStartCapture(config, streamRef.current);
       return;
     }
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown, micActive, onStartCapture, quality, source, title]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
 
   return (
     <div
@@ -152,6 +191,8 @@ export default function CaptureSetup({ onStartCapture, onClose }: CaptureSetupPr
               begins.
             </p>
 
+            {permissionError && <p className="text-xs text-error">{permissionError}</p>}
+
             {/* Actions */}
             <div className="flex gap-3 border-t border-border pt-4">
               <button
@@ -163,10 +204,11 @@ export default function CaptureSetup({ onStartCapture, onClose }: CaptureSetupPr
               </button>
               <button
                 type="submit"
-                className="flex w-1/2 select-none items-center justify-center gap-2 rounded bg-accent py-2.5 text-xs font-bold text-on-accent hover:opacity-90"
+                disabled={acquiring}
+                className="flex w-1/2 select-none items-center justify-center gap-2 rounded bg-accent py-2.5 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-60"
               >
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Start capture
+                {acquiring ? "Requesting…" : "Start capture"}
               </button>
             </div>
           </form>

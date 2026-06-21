@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   Crown,
   Mail,
@@ -11,6 +12,8 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { useShell } from "@/components/shell-context";
+import { createClient } from "@/lib/supabase/client";
 import type { UserProfile, WorkspaceMember, WorkspacePreferences } from "@/lib/types";
 
 interface SettingsProps {
@@ -20,24 +23,39 @@ interface SettingsProps {
 }
 
 export default function Settings({ preferences, members, profile }: SettingsProps) {
+  const router = useRouter();
+  const { workspaceId } = useShell();
   const [activeTab, setActiveTab] = useState<"general" | "team">("general");
 
-  // General preferences (local until persistence is wired).
+  // Workspace name + display name persist. Capture/SOP toggles are client-only
+  // until a workspace-settings table exists (not in the Phase 1 schema).
   const [quality, setQuality] = useState(preferences.defaultVideoQuality);
   const [autoSop, setAutoSop] = useState(preferences.autoGenerateSops);
   const [highlightCursor, setHighlightCursor] = useState(preferences.highlightCursor);
   const [workspaceName, setWorkspaceName] = useState(preferences.workspaceName);
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  // Team invites (local list for the shell).
+  // Team invites are local in Phase 1 (real invite delivery is out of scope).
   const [memberList, setMemberList] = useState<WorkspaceMember[]>(members);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<WorkspaceMember["role"]>("viewer");
 
-  const handleSave = (e: FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
-    // TODO(phase-1): persist preferences/profile via Supabase.
+    setSaving(true);
+    setSaved(false);
+    const supabase = createClient();
+    await supabase.auth.updateUser({ data: { full_name: displayName.trim() } });
+    if (workspaceName.trim()) {
+      await supabase.from("workspaces").update({ name: workspaceName.trim() }).eq("id", workspaceId);
+    }
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+    router.refresh();
   };
 
   const handleAddMember = (e: FormEvent) => {
@@ -180,10 +198,11 @@ export default function Settings({ preferences, members, profile }: SettingsProp
 
               <button
                 type="submit"
-                className="flex w-full select-none items-center justify-center gap-2 rounded bg-accent py-2.5 text-xs font-bold text-on-accent shadow-card hover:opacity-90"
+                disabled={saving}
+                className="flex w-full select-none items-center justify-center gap-2 rounded bg-accent py-2.5 text-xs font-bold text-on-accent shadow-card hover:opacity-90 disabled:opacity-60"
               >
                 <Save className="h-3.5 w-3.5" />
-                Save preferences
+                {saving ? "Saving…" : saved ? "Saved" : "Save preferences"}
               </button>
             </div>
           </div>

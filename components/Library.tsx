@@ -14,6 +14,7 @@ import {
   Video,
 } from "lucide-react";
 import { useShell } from "@/components/shell-context";
+import { createClient } from "@/lib/supabase/client";
 import { formatDuration, type Folder as FolderType, type Recording } from "@/lib/types";
 
 interface LibraryProps {
@@ -23,13 +24,12 @@ interface LibraryProps {
 
 export default function Library({ folders, recordings }: LibraryProps) {
   const router = useRouter();
-  const { openShare } = useShell();
+  const { openShare, workspaceId } = useShell();
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  // Local-only until folder creation is wired to Supabase (Phase 1 functional).
-  const [draftFolders, setDraftFolders] = useState<FolderType[]>(folders);
   const [newFolderName, setNewFolderName] = useState("");
   const [showAddFolder, setShowAddFolder] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = recordings.filter((rec) =>
     activeFolder === "all" ? true : rec.folderId === activeFolder
@@ -37,16 +37,25 @@ export default function Library({ folders, recordings }: LibraryProps) {
 
   const openPlayback = (rec: Recording) => router.push(`/playback/${rec.id}`);
 
-  const handleAddFolder = (e: FormEvent) => {
+  const handleAddFolder = async (e: FormEvent) => {
     e.preventDefault();
     const name = newFolderName.trim();
     if (!name) return;
-    setDraftFolders((prev) => [
-      ...prev,
-      { id: `draft-${Date.now()}`, workspaceId: "", name, recordingCount: 0 },
-    ]);
     setNewFolderName("");
     setShowAddFolder(false);
+    const supabase = createClient();
+    const { error } = await supabase.from("folders").insert({ workspace_id: workspaceId, name });
+    if (!error) router.refresh();
+  };
+
+  const handleDelete = async (id: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/recordings/${id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -128,16 +137,16 @@ export default function Library({ folders, recordings }: LibraryProps) {
                 active={activeFolder === "all"}
                 onClick={() => setActiveFolder("all")}
               />
-              {draftFolders.map((f) => (
+              {folders.map((f) => (
                 <FolderRow
                   key={f.id}
                   label={f.name}
-                  count={recordings.filter((r) => r.folderId === f.id).length}
+                  count={f.recordingCount}
                   active={activeFolder === f.id}
                   onClick={() => setActiveFolder(f.id)}
                 />
               ))}
-              {draftFolders.length === 0 && (
+              {folders.length === 0 && (
                 <p className="px-3 py-2 text-xs text-fg-tertiary">No folders yet.</p>
               )}
             </div>
@@ -202,7 +211,9 @@ export default function Library({ folders, recordings }: LibraryProps) {
                             <button
                               type="button"
                               title="Delete"
-                              className="rounded p-1 text-fg-tertiary hover:text-error"
+                              disabled={busyId === rec.id}
+                              onClick={() => handleDelete(rec.id)}
+                              className="rounded p-1 text-fg-tertiary hover:text-error disabled:opacity-60"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>

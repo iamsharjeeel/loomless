@@ -13,8 +13,10 @@ import ShareModal from "@/components/ShareModal";
 export default function GlobalOverlays() {
   const router = useRouter();
   const {
+    workspaceId,
     captureOpen,
     captureConfig,
+    captureStream,
     closeCapture,
     startCapture,
     stopCapture,
@@ -28,15 +30,18 @@ export default function GlobalOverlays() {
         <CaptureSetup onClose={closeCapture} onStartCapture={startCapture} />
       )}
 
-      {captureConfig && (
+      {captureConfig && captureStream && (
         <Viewfinder
           config={captureConfig}
-          onStopCapture={() => {
-            // Phase 1: capture/upload is not wired. End the takeover and return
-            // to the dashboard, where the new recording will appear once the
-            // functional pass lands.
+          stream={captureStream}
+          workspaceId={workspaceId}
+          onDone={(recordingId) => {
             stopCapture();
-            router.push("/");
+            router.push(`/playback/${recordingId}`);
+            router.refresh();
+          }}
+          onAbort={() => {
+            stopCapture();
             router.refresh();
           }}
         />

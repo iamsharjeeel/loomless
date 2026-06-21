@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { FolderHeart, LayoutDashboard, Plus, Settings, User } from "lucide-react";
 import { useShell } from "@/components/shell-context";
 import ThemeToggle from "@/components/ThemeToggle";
+import SignOutButton from "@/components/SignOutButton";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -88,9 +89,13 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Theme toggle + profile shortcut */}
+        {/* Theme toggle + sign out + profile shortcut */}
         <div className="mt-auto flex flex-col items-center space-y-4">
           <ThemeToggle className="flex h-10 w-10 items-center justify-center rounded border border-border text-fg-tertiary transition-colors hover:bg-surface-2 hover:text-fg-primary" />
+          <SignOutButton
+            variant="icon"
+            className="flex h-10 w-10 items-center justify-center rounded border border-border text-fg-tertiary transition-colors hover:bg-surface-2 hover:text-fg-primary"
+          />
           <Link
             href="/profile"
             aria-label="Profile"

@@ -112,7 +112,7 @@ alter table public.recordings        enable row level security;
 -- workspaces
 drop policy if exists "workspaces_select" on public.workspaces;
 create policy "workspaces_select" on public.workspaces
-  for select using (public.is_workspace_member(id));
+  for select using (public.is_workspace_member(id) or owner_id = auth.uid());
 
 drop policy if exists "workspaces_insert" on public.workspaces;
 create policy "workspaces_insert" on public.workspaces
